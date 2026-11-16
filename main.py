@@ -28,7 +28,7 @@ def run(pdf1, pdf2, dockerfiles, out_dir="output", prompt="few-shot", hadolint="
 
     print("[Task-3] Mapping differences to Hadolint rules and scanning Dockerfiles")
     rules = executor.map_differences_to_rules(*executor.load_text_pair(names, reqs), out / "hadolint_rules.txt")
-    df = executor.run_hadolint(rules, dockerfiles, hadolint_bin=hadolint)
+    df = executor.run_hadolint(rules, dockerfiles, hadolint_bin=hadolint, cache_dir=Path(out_dir) / ".cache")
     csv = executor.write_results_csv(df, out / "hadolint_results.csv")
 
     print(f"Done. Results in {out}/")

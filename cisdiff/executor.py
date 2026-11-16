@@ -9,10 +9,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import List, Tuple
 
@@ -23,6 +25,7 @@ from cisdiff.comparator import NO_NAME_DIFF, NO_REQ_DIFF
 NO_DIFF_FOUND = "NO DIFFERENCES FOUND"
 NO_MAPPING_FOUND = "NO MAPPING FOUND"
 CSV_HEADERS = ["FilePath", "DefaultSeverity", "RULEID", "COUNT"]
+BATCH_SIZE = 1000
 
 # CIS Docker Benchmark section 4 ("Container Images and Build File") requirements that Hadolint
 # can check, as word-bounded patterns -> Hadolint rules. Other CIS sections are not about
@@ -69,11 +72,18 @@ def map_differences_to_rules(names: List[str], reqs: List[str], out_path) -> Pat
     return out_path
 
 
-def run_hadolint(rules_path, dockerfiles_dir, hadolint_bin: str = "hadolint") -> pd.DataFrame:
+def _scan(exe: str, files: List[str]) -> List[list]:
+    proc = subprocess.run([exe, "--no-fail", "-f", "json", *files], capture_output=True, text=True)
+    return [[i["file"], i["code"], i["level"], i["line"]] for i in json.loads(proc.stdout or "[]")]
+
+
+def run_hadolint(rules_path, dockerfiles_dir, hadolint_bin: str = "hadolint", cache_dir=None) -> pd.DataFrame:
     """Function 3: run Hadolint on every Dockerfile under dockerfiles_dir.
 
     All rules run when the rules file says NO DIFFERENCES FOUND / NO MAPPING FOUND,
-    otherwise only the listed rules are kept.
+    otherwise only the listed rules are kept. Files are scanned BATCH_SIZE at a time,
+    since the dataset has ~400k Dockerfiles and one process per file takes hours.
+    With cache_dir set, the full scan is saved and reused by later runs on the same folder.
     """
     exe = shutil.which(hadolint_bin)
     if exe is None:
@@ -85,15 +95,29 @@ def run_hadolint(rules_path, dockerfiles_dir, hadolint_bin: str = "hadolint") ->
     lines = [ln.strip() for ln in Path(rules_path).read_text(encoding="utf-8").splitlines() if ln.strip()]
     selected = set() if lines in ([NO_DIFF_FOUND], [NO_MAPPING_FOUND]) else set(lines)
 
-    files = sorted(p for p in root.rglob("*") if p.is_file() and "dockerfile" in p.name.lower())
-    rows = []
-    for f in files:
-        proc = subprocess.run([exe, "--no-fail", "-f", "json", str(f)], capture_output=True, text=True)
-        for item in json.loads(proc.stdout or "[]"):
-            if not selected or item["code"] in selected:
-                rows.append({"FilePath": str(f), "RULEID": item["code"], "DefaultSeverity": item["level"],
-                             "Line": item["line"], "Message": item["message"]})
-    return pd.DataFrame(rows, columns=["FilePath", "RULEID", "DefaultSeverity", "Line", "Message"])
+    # skip the __MACOSX/._* copies macOS adds to zip files
+    files = sorted(str(p) for p in root.rglob("*") if p.is_file() and "dockerfile" in p.name.lower()
+                   and "__MACOSX" not in p.parts and not p.name.startswith("._"))
+
+    cache = None
+    if cache_dir:
+        key = hashlib.sha256(f"{root.resolve()}|{len(files)}|{exe}".encode()).hexdigest()[:16]
+        cache = Path(cache_dir) / f"hadolint-{key}.pkl"
+    if cache and cache.is_file():
+        df = pd.read_pickle(cache)
+    else:
+        batches = [files[i:i + BATCH_SIZE] for i in range(0, len(files), BATCH_SIZE)]
+        with ThreadPoolExecutor(max_workers=2) as pool:  # hadolint is multi-threaded already
+            rows = [r for batch in pool.map(lambda b: _scan(exe, b), batches) for r in batch]
+        df = pd.DataFrame(rows, columns=["FilePath", "RULEID", "DefaultSeverity", "Line"])
+        if cache:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            df.to_pickle(cache)
+    if selected:
+        df = df[df["RULEID"].isin(selected)].reset_index(drop=True)
+    # paths relative to the Dockerfile folder keep the CSV small (~1M rows on the real dataset)
+    df["FilePath"] = df["FilePath"].map(lambda f: Path(f).relative_to(root).as_posix())
+    return df
 
 
 def write_results_csv(df: pd.DataFrame, out_path) -> Path:
