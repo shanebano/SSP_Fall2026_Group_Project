@@ -6,9 +6,9 @@ Detects changes between two versions of the CIS Docker Benchmark and runs Hadoli
 
 | Name | BannerID | Email | Tasks |
 |------|----------|-------|-------|
-| Shane Banachowski | TBD | shb0064@auburn.edu | 2, 4 |
-| Joseph Wilkerson | TBD | Jaw0216@auburn.edu | 1 |
-| Rett Wilson | TBD | Jew0063@auburn.edu | 3 |
+| Shane Banachowski | 904513288 | shb0064@auburn.edu | 2, 4 |
+| Joseph Wilkerson | 904289775 | Jaw0216@auburn.edu | 1 |
+| Rett Wilson | 904212996 | Jew0063@auburn.edu | 3 |
 
 **LLM used for Task-1:** Gemma-3-1B (`google/gemma-3-1b-it`)
 
