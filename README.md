@@ -48,6 +48,7 @@ Options: `--out` sets the output folder, `--prompt` picks which prompt type's an
 ./build.sh
 ./dist/cisdiff/cisdiff docker-cis-v0.pdf docker-cis-v1.pdf --dockerfiles path/to/dockerfiles
 ```
+The binary is not committed because of its size (it bundles PyTorch). Build it with `./build.sh` as shown above.
 
 The binary takes the same arguments as `main.py`. Run it from the activated venv so Hadolint is on the PATH.
 
@@ -77,6 +78,8 @@ The binary takes the same arguments as `main.py`. Run it from the activated venv
 ```bash
 pytest
 ```
+
+GitHub has no event for `git pull`, so the workflow runs every test on each push and pull request, which is when contributors' changes reach the repo.
 
 One test per function across all three tasks. Gemma is replaced by a fake generator in the tests, so they run without downloading the model.
 
