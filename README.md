@@ -82,4 +82,4 @@ One test per function across all three tasks. Gemma is replaced by a fake genera
 
 ## Committed results
 
-`output/` holds the results for all five input pairs. The Dockerfile dataset is not in the repo, so these CSVs come from two small sample Dockerfiles. Rerun with `--dockerfiles` pointed at the unzipped `dockerfiles.zip` to get the real scan.
+`output/` holds the results for all five input pairs, scanned against the full `dockerfiles.zip` dataset (397,567 Dockerfiles). No pair changed a CIS Dockerfile requirement, so every pair ran Hadolint with all rules and the five CSVs are identical. The first scan takes a little over an hour; later runs on the same folder reuse it from `output/.cache/`. The dataset itself is not in the repo.
