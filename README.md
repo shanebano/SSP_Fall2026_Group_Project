@@ -1,4 +1,4 @@
-# SSP_Fall2026_Research_Project
+# SSP_Fall2026_Group_Project
 
 Detects changes between two versions of the CIS Docker Benchmark and runs Hadolint on a set of Dockerfiles based on what changed.
 
